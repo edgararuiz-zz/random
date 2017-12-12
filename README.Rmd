@@ -1,6 +1,9 @@
 ---
 title: "dplyr and in-database scoring"
-output: github_document
+output:
+  github_document:
+    toc: true
+    toc_depth: 3
 ---
 
 ```{r setup, include=FALSE}
@@ -19,7 +22,9 @@ Even if the capability to run models inside the database would be available toda
 
 The idea is to use the same approach as `dbplot` of using `dplyr` and `rlang` to create a generic formula that can then be translated to SQL appropriate syntax.
 
-## Parse an R model
+## Functions
+
+### Parse an R model
 
 The `score()` function decomposes the model variables and builds a `dplyr` formula. The `score()` function uses the model’s `class` to use the correct parser.
 
@@ -58,7 +63,7 @@ score.lm <- function(model){
 
 ```
 
-## Save results (w/o importing them into memory)
+### Save results (w/o importing them into memory)
 
 The `db_update()` function sends uses the `UPDATE` clause to apply the formula created in `score()`. This enables the entire calculation and recording the new values exclusively inside the database.  The function uses the `sql_translate()` command to translate the `dplyr` formula into a vendor appropriate SQL statement:
 
@@ -79,7 +84,7 @@ db_update.DBIConnection <- function(con, table, data, model, prediction_var = NU
 
 ## Quick demo
 
-## R
+### Local data
 
 
 ```{r}
@@ -107,7 +112,7 @@ The `score()` function can be used in-place of `predict()`.  It breaks down the 
 score(model)
 ```
 
-## Database
+### Database
 
 
 Open an RSQLite connection:
@@ -119,6 +124,7 @@ dbWriteTable(con, "df", df)
   
 ```
 
+## `db_update()`
 
 Run `db_update()` to save the new results inside the `score` field.  
 
@@ -126,6 +132,8 @@ Run `db_update()` to save the new results inside the `score` field.
 ```{r}
 db_update(con, "df", tbl(con, "df"), model, "score")
 ```
+
+### Confirm accurracy
 
 ```{r, warning = FALSE}
 tbl(con, "df")
@@ -137,7 +145,9 @@ The results from `predict()` are the exact same as those returned by `score()`
 predict(model, df)
 ```
 
-## Further utility: local data
+## Further utility
+
+### Use with regular local data and `dplyr`
 
 The `score()` function can be called inside a `dplyr` verb, so it can also be used with local data:
 
@@ -149,5 +159,11 @@ df %>%
 ```
 
 
+### `tidymodel()`
 
+The `tidymodel()` function makes a quick tidy table from the model.  This helps simplify the`socre()` code.  The source code is inside the `tidymodel.R` script.
+
+```{r}
+tidymodel(model)
+```
 

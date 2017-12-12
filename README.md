@@ -1,6 +1,21 @@
 dplyr and in-database scoring
 ================
 
+-   [Motivation](#motivation)
+-   [Functions](#functions)
+    -   [Parse an R model](#parse-an-r-model)
+    -   [Save results (w/o importing them into memory)](#save-results-wo-importing-them-into-memory)
+-   [Quick demo](#quick-demo)
+    -   [Local data](#local-data)
+    -   [`lm` Model](#lm-model)
+    -   [`score()`](#score)
+    -   [Database](#database)
+-   [`db_update()`](#db_update)
+    -   [Confirm accurracy](#confirm-accurracy)
+-   [Further utility](#further-utility)
+    -   [Use with regular local data and `dplyr`](#use-with-regular-local-data-and-dplyr)
+    -   [`tidymodel()`](#tidymodel)
+
 Motivation
 ----------
 
@@ -8,8 +23,10 @@ Even if the capability to run models inside the database would be available toda
 
 The idea is to use the same approach as `dbplot` of using `dplyr` and `rlang` to create a generic formula that can then be translated to SQL appropriate syntax.
 
-Parse an R model
-----------------
+Functions
+---------
+
+### Parse an R model
 
 The `score()` function decomposes the model variables and builds a `dplyr` formula. The `score()` function uses the model’s `class` to use the correct parser.
 
@@ -47,8 +64,7 @@ score.lm <- function(model){
 }
 ```
 
-Save results (w/o importing them into memory)
----------------------------------------------
+### Save results (w/o importing them into memory)
 
 The `db_update()` function sends uses the `UPDATE` clause to apply the formula created in `score()`. This enables the entire calculation and recording the new values exclusively inside the database. The function uses the `sql_translate()` command to translate the `dplyr` formula into a vendor appropriate SQL statement:
 
@@ -69,8 +85,7 @@ db_update.DBIConnection <- function(con, table, data, model, prediction_var = NU
 Quick demo
 ----------
 
-R
--
+### Local data
 
 ``` r
 df <- tibble(
@@ -119,8 +134,7 @@ score(model)
     ## ((ifelse((z) == ("b"), (0.198653846153846), 0)) + ((x) * (1.02051282051282))) + 
     ##     (0.31025641025641)
 
-Database
---------
+### Database
 
 Open an RSQLite connection:
 
@@ -128,6 +142,9 @@ Open an RSQLite connection:
 con <- dbConnect(RSQLite::SQLite(), path = ":memory:")
 dbWriteTable(con, "df", df)
 ```
+
+`db_update()`
+-------------
 
 Run `db_update()` to save the new results inside the `score` field.
 
@@ -139,6 +156,8 @@ db_update(con, "df", tbl(con, "df"), model, "score")
     ##   SQL  UPDATE 'df' SET 'score' = ((CASE WHEN ((`z`) = ('b')) THEN ((0.198653846153846)) ELSE (0.0) END) + ((`x`) * (1.02051282051282))) + (0.31025641025641)
     ##   ROWS Fetched: 0 [complete]
     ##        Changed: 9
+
+### Confirm accurracy
 
 ``` r
 tbl(con, "df")
@@ -169,8 +188,10 @@ predict(model, df)
     ##        9 
     ## 9.693526
 
-Further utility: local data
----------------------------
+Further utility
+---------------
+
+### Use with regular local data and `dplyr`
 
 The `score()` function can be called inside a `dplyr` verb, so it can also be used with local data:
 
@@ -191,3 +212,19 @@ df %>%
     ## 7     7  7.66     b     0   7.652500
     ## 8     8  8.20     b     0   8.673013
     ## 9     9 10.00     b     0   9.693526
+
+### `tidymodel()`
+
+The `tidymodel()` function makes a quick tidy table from the model. This helps simplify the`socre()` code. The source code is inside the `tidymodel.R` script.
+
+``` r
+tidymodel(model)
+```
+
+    ## # A tibble: 3 x 7
+    ##        labels  vals  estimate  std_error    t_value           pr
+    ##         <chr> <chr>     <dbl>      <dbl>      <dbl>        <dbl>
+    ## 1 (Intercept)       0.3102564 0.21251009  1.4599608 1.945945e-01
+    ## 2           x       1.0205128 0.05036972 20.2604416 9.394300e-07
+    ## 3           z     b 0.1986538 0.26172876  0.7590066 4.765978e-01
+    ## # ... with 1 more variables: type <chr>
