@@ -1,18 +1,19 @@
 
+source("model.R")
+source("parsemodel.R")
 
 
-df <- mtcars %>%
-  mutate(am = paste0("am", am),
-         cyl = paste0("cyl", cyl))
+model <- lm(mpg ~ wt + am, data = mtcars)
 
-model <-    lm(mpg ~ am + wt + cyl, df)
+m2 <- lm(mpg ~ wt + as.factor(am), data = mtcars)
+
+parsemodel(model)
 
 
-test_predict <- df %>%
-  mutate(
-    prediction = !!score(model))
 
-test_predict
+mtcars %>%
+  predction_to_column(model) %>%
+  head()
 
-df %>%
-  predction_to_column(model)
+
+

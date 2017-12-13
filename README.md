@@ -12,9 +12,8 @@ dplyr and in-database scoring
     -   [Database](#database)
 -   [`db_update()`](#db_update)
     -   [Confirm accurracy](#confirm-accurracy)
--   [Further utility](#further-utility)
-    -   [Use with regular local data and `dplyr`](#use-with-regular-local-data-and-dplyr)
-    -   [`tidymodel()`](#tidymodel)
+-   [`parsemodel()`](#parsemodel)
+-   [`prediction_to_column()`](#prediction_to_column)
 
 Motivation
 ----------
@@ -31,37 +30,8 @@ Functions
 The `score()` function decomposes the model variables and builds a `dplyr` formula. The `score()` function uses the model’s `class` to use the correct parser.
 
 ``` r
-source("tidymodel.R")
-
-score <- function(model){
-  UseMethod("score")
-}
-
-score.lm <- function(model){
-  
-  mt <- tidymodel(model) %>%
-    mutate(sym_labels = syms(labels))
-  
-  coefs <- filter(mt, type == "categorical") 
-  part1 <- map2(coefs$sym_labels, coefs$vals, 
-                function(name, val) expr((!!name) == (!!val)))
-  f <- map2(part1, coefs$estimate, 
-            function(name, est) expr(ifelse(!!name, (!!est), 0)))
-  
-  coefs <- filter(mt, type == "continuous") 
-  f <- c(f,map2(coefs$sym_labels, coefs$estimate, 
-                function(name, val) expr((!!name) * (!!val))))
-  
-  intercept <- filter(mt, labels == "(Intercept)")
-  
-  if(nrow(intercept) > 0){
-    f <- c(f, intercept$estimate)
-  }
-  
-  
-  reduce(f, function(l, r) expr((!!l) + (!!r)))
-  
-}
+source("parsemodel.R")
+source("model.R")
 ```
 
 ### Save results (w/o importing them into memory)
@@ -188,16 +158,31 @@ predict(model, df)
     ##        9 
     ## 9.693526
 
-Further utility
----------------
+`parsemodel()`
+--------------
 
-### Use with regular local data and `dplyr`
+The `parsemodel()` function makes a quick tidy table from the model. This helps simplify the`socre()` code. The source code is inside the `tidymodel.R` script.
 
-The `score()` function can be called inside a `dplyr` verb, so it can also be used with local data:
+``` r
+parsemodel(model)
+```
+
+    ## # A tibble: 3 x 7
+    ##        labels  vals  estimate  std_error    t_value           pr
+    ##         <chr> <chr>     <dbl>      <dbl>      <dbl>        <dbl>
+    ## 1 (Intercept)       0.3102564 0.21251009  1.4599608 1.945945e-01
+    ## 2           x       1.0205128 0.05036972 20.2604416 9.394300e-07
+    ## 3           z     b 0.1986538 0.26172876  0.7590066 4.765978e-01
+    ## # ... with 1 more variables: type <chr>
+
+`prediction_to_column()`
+------------------------
+
+The `score()` function can be called inside a `dplyr` verb, so it can also be used with local data. A function similar to `tibble::rowid_to_column`, currently called `prediction_to_column()` can be used with a local `data.frame` to easily add a column with the fitted values.
 
 ``` r
 df %>%
-  mutate(prediction = !! score(model))
+  prediction_to_column(model)
 ```
 
     ## # A tibble: 9 x 5
@@ -212,19 +197,3 @@ df %>%
     ## 7     7  7.66     b     0   7.652500
     ## 8     8  8.20     b     0   8.673013
     ## 9     9 10.00     b     0   9.693526
-
-### `tidymodel()`
-
-The `tidymodel()` function makes a quick tidy table from the model. This helps simplify the`socre()` code. The source code is inside the `tidymodel.R` script.
-
-``` r
-tidymodel(model)
-```
-
-    ## # A tibble: 3 x 7
-    ##        labels  vals  estimate  std_error    t_value           pr
-    ##         <chr> <chr>     <dbl>      <dbl>      <dbl>        <dbl>
-    ## 1 (Intercept)       0.3102564 0.21251009  1.4599608 1.945945e-01
-    ## 2           x       1.0205128 0.05036972 20.2604416 9.394300e-07
-    ## 3           z     b 0.1986538 0.26172876  0.7590066 4.765978e-01
-    ## # ... with 1 more variables: type <chr>

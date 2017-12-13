@@ -4,12 +4,12 @@ library(purrr)
 library(rlang)
 library(tibble)
 
-tidymodel <- function(model){
-  UseMethod("tidymodel")
+parsemodel <- function(model){
+  UseMethod("parsemodel")
 }
 
 
-tidymodel.lm <- function(model){
+parsemodel.lm <- function(model){
   
   
   terms <- model$terms
@@ -19,19 +19,21 @@ tidymodel.lm <- function(model){
   tidy <- tibble(labels)
   
   xl <- model$xlevels
-  xlevels <- names(xl) %>%
-    map({~tibble(
-      labels = .x,
-      vals = as.character(xl[[.x]])) %>%
-        rowid_to_column("row")}
-    ) %>%
-    bind_rows() %>%
-    filter(row > 1) %>%
-    select(-row)
   
-  tidy <- tidy %>%
-    left_join(xlevels, by = "labels") %>%
-    mutate(vals = ifelse(is.na(vals), "", vals))
+  if(length(xl) > 0){
+    xlevels <- names(xl) %>%
+      map({~tibble(
+        labels = .x,
+        vals = as.character(xl[[.x]])) %>%
+          rowid_to_column("row")}
+      ) %>%
+      bind_rows() %>%
+      filter(row > 1) %>%
+      select(-row)
+    
+    tidy <- tidy %>%
+      left_join(xlevels, by = "labels") 
+  }
   
   i <- attr(terms, "intercept")
   if(!is.null(i)){
@@ -52,7 +54,8 @@ tidymodel.lm <- function(model){
   
   tidy <- tidy %>%
     bind_cols(coef) %>%
-    mutate(confirm_label = paste0(labels, vals),
+    mutate(vals = ifelse(is.na(vals), "", vals),
+           confirm_label = paste0(labels, vals),
            confirm = coef_labels == confirm_label) %>%
     mutate(
       type = case_when(
@@ -60,7 +63,7 @@ tidymodel.lm <- function(model){
         vals == "" ~ "continuous",
         vals != "" ~ "categorical",
         TRUE ~ "error"
-      ))
+      )) 
   
   errors <- nrow(filter(tidy, type == "error"))
   
