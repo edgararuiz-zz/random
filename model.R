@@ -14,11 +14,11 @@ fun_calls <- function(f) {
   }
 }
 
-acceptable_formula <- function(){
+acceptable_formula <- function(model){
   UseMethod("acceptable_formula")
 }
 
-acceptable_formula <- function(model){
+acceptable_formula.default <- function(model){
   
   # Check for invalid contrasts
   if(length(model$contrasts)){
@@ -34,7 +34,7 @@ acceptable_formula <- function(model){
   
   # Check for in-line formulas
   funs <- fun_calls(model$call)
-  funs <- funs[!(funs %in% c("~", "+", "-", "lm"))]
+  funs <- funs[!(funs %in% c("~", "+", "-", "lm", "glm"))]
   if(length(funs) > 0){
     stop(
       "Functions inside the formula are not supported. Functions detected: ",
@@ -47,7 +47,7 @@ score <- function(model){
   UseMethod("score")
 }
 
-score.lm <- function(model){
+score.default <- function(model){
   
   acceptable_formula(model)
   

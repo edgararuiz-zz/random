@@ -9,7 +9,7 @@ parsemodel <- function(model){
 }
 
 
-parsemodel.lm <- function(model){
+parsemodel.default <- function(model){
   
   
   terms <- model$terms
