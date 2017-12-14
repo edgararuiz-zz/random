@@ -19,6 +19,20 @@ acceptable_formula <- function(){
 }
 
 acceptable_formula <- function(model){
+  
+  # Check for invalid contrasts
+  if(length(model$contrasts)){
+    contr <- model$contrasts
+    contr <- contr[!("contr.treatment"  %in% model$contrasts)]
+    if(length(contr >0)){
+      stop(
+        "The treatment contrast is the only one supported at this time. Field(s) with an invalid contrast are: ",
+        paste0("`", names(contr), "`", collapse = ","),
+        call. = FALSE)     
+    }
+  }
+  
+  # Check for in-line formulas
   funs <- fun_calls(model$call)
   funs <- funs[!(funs %in% c("~", "+", "-", "lm"))]
   if(length(funs) > 0){
@@ -54,6 +68,11 @@ score.lm <- function(model){
   
   if(nrow(intercept) > 0){
     f <- c(f, intercept$estimate)
+  }
+  
+  offset <- model$call$offset
+  if(!is.null(offset)){
+    f <- c(f, offset)
   }
   
   
