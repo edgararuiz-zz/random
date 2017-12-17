@@ -14,6 +14,8 @@ dplyr and in-database scoring
     -   [Confirm accurracy](#confirm-accurracy)
 -   [`parsemodel()`](#parsemodel)
 -   [`prediction_to_column()`](#prediction_to_column)
+-   [More tests](#more-tests)
+-   [Prediction intervals](#prediction-intervals)
 
 Motivation
 ----------
@@ -197,3 +199,114 @@ df %>%
     ## 7     7  7.66     b     0   7.652500
     ## 8     8  8.20     b     0   8.673013
     ## 9     9 10.00     b     0   9.693526
+
+More tests
+----------
+
+General tests to confirm that the calculations match the base `predict()` calculation.
+
+``` r
+source("model.R")
+source("parsemodel.R")
+
+
+
+df <- mtcars %>%
+  mutate(cyl = paste0("cyl", cyl))
+
+m1 <- lm(mpg ~ wt + am, weights = cyl, data = mtcars)
+m2 <- lm(mpg ~ wt + am, data = mtcars)
+m3 <- lm(mpg ~ wt + am, offset = cyl, data = mtcars)
+m4 <- lm(mpg ~ wt + cyl, data = df)
+m5 <- glm(am ~ wt + mpg, data = mtcars)
+m6 <- glm(am ~ cyl + mpg, data = df)
+
+
+a1 <- as.numeric(predict(m1, mtcars))
+a2 <- as.numeric(predict(m2, mtcars))
+a3 <- as.numeric(predict(m3, mtcars))
+a4 <- as.numeric(predict(m4, df))
+a5 <- as.numeric(predict(m5, df))
+a6 <- as.numeric(predict(m6, df))
+
+
+b1 <- prediction_to_column(mtcars, m1) %>% pull()
+b2 <- prediction_to_column(mtcars, m2) %>% pull()
+b3 <- prediction_to_column(mtcars, m3) %>% pull()
+b4 <- prediction_to_column(df, m4) %>% pull()
+b5 <- prediction_to_column(df, m5) %>% pull()
+b6 <- prediction_to_column(df, m6) %>% pull()
+
+
+
+sum(a1 - b1 > 0.0000000000001)
+```
+
+    ## [1] 0
+
+``` r
+sum(a2 - b2 > 0.0000000000001)
+```
+
+    ## [1] 0
+
+``` r
+sum(a3 - b3 > 0.0000000000001)
+```
+
+    ## [1] 0
+
+``` r
+sum(a4 - b4 > 0.0000000000001)
+```
+
+    ## [1] 0
+
+``` r
+sum(a6 - b6 > 0.0000000000001) 
+```
+
+    ## [1] 0
+
+Prediction intervals
+--------------------
+
+The source code for the `prediction_interval()` function is found in the `intervals.R` script.
+
+``` r
+source("intervals.R")
+
+model <- m4
+
+
+df <- mtcars %>%
+  mutate(cyl = paste0("cyl", cyl))
+
+head(df) %>%
+  mutate(fit = !!score(model),
+         interval = !!prediction_interval(model, 0.95)) %>%
+  mutate(lwr = fit - interval,
+         upr = fit + interval) %>%
+  select(fit, lwr, upr)
+```
+
+    ##        fit      lwr      upr
+    ## 1 21.33650 15.68489 26.98812
+    ## 2 20.51907 14.90737 26.13078
+    ## 3 26.55377 21.08302 32.02452
+    ## 4 19.42916 13.82790 25.03043
+    ## 5 16.89262 11.40284 22.38241
+    ## 6 18.64379 13.01958 24.26800
+
+``` r
+head(df) %>%
+  predict(model, ., interval = "prediction")
+```
+
+    ##        fit      lwr      upr
+    ## 1 21.33650 15.68489 26.98812
+    ## 2 20.51907 14.90737 26.13078
+    ## 3 26.55377 21.08302 32.02452
+    ## 4 19.42916 13.82790 25.03043
+    ## 5 16.89262 11.40284 22.38241
+    ## 6 18.64379 13.01958 24.26800

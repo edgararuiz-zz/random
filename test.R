@@ -1,6 +1,7 @@
 
 source("model.R")
 source("parsemodel.R")
+source("intervals.R")
 
 
 df <- mtcars %>%
@@ -37,7 +38,19 @@ sum(a3 - b3 > 0.0000000000001)
 sum(a4 - b4 > 0.0000000000001)
 sum(a6 - b6 > 0.0000000000001) 
 
+model <- m4
 
 
+df <- mtcars %>%
+  mutate(cyl = paste0("cyl", cyl))
+
+head(df) %>%
+  mutate(fit = !!score(model),
+         interval = !!prediction_interval(model, 0.95)) %>%
+  mutate(lwr = fit - interval,
+         upr = fit + interval) %>%
+  select(fit, lwr, upr)
 
 
+head(df) %>%
+  predict(model, ., interval = "prediction")
