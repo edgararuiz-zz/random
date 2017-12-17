@@ -41,11 +41,7 @@ prediction_interval <- function(model, interval = 0.95){
   mt <- parsemodel(model) %>%
     mutate(sym_labels = syms(labels))
   
-  res.var <- {
-    r <- model$residuals
-    rss <- sum(r^2 )
-    df <- model$df.residual
-    rss/df}
+  res.var <- summary(model)$sigma^2
   
   qr <- qr.solve(qr.R(model$qr))
   
