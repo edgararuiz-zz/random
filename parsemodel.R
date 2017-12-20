@@ -45,45 +45,52 @@ parsemodel.default <- function(model){
       bind_rows(tidy) 
   }
   
-  
-  c <- summary(model)$coefficients 
-  coef_labels <- attr(c, "dimnames")[[1]]
-  
-  coef <- as_tibble(c) %>%
-    mutate(coef_labels = coef_labels)
-  
-  tidy <- tidy %>%
-    bind_cols(coef) %>%
-    mutate(vals = ifelse(is.na(vals), "", vals),
-           confirm_label = paste0(labels, vals),
-           confirm = coef_labels == confirm_label) %>%
+  tidy <- tidy %>% 
     mutate(
+      vals = ifelse(is.na(vals), "", vals),
       type = case_when(
         labels == "(Intercept)" ~ "intercept",
         vals == "" ~ "continuous",
         vals != "" ~ "categorical",
-        TRUE ~ "error"
-      )) 
+        TRUE ~ "error")
+    ) %>%
+    bind_rows(tibble(
+      labels = c("sigma2", "residual", "offset", "model"), 
+      vals = c(
+        summary(model)$sigma^2,
+        model$df.residual,
+        as.character(model$call$offset),
+        class(model)[[1]]
+      ),
+      type = "variable"
+    ))
   
-  errors <- nrow(filter(tidy, type == "error"))
   
-  if(all(tidy$confirm) & errors == 0){
-    tidy %>%
-      select(
-        -confirm,
-        -confirm_label,
-        -coef_labels
-      ) %>%
-      rename(
-        pr = `Pr(>|t|)`,
-        t_value = `t value`,
-        std_error = `Std. Error`,
-        estimate = Estimate
-      ) 
-  } else {
-    stop(
-      "Error parsing the model"
-    )
+  
+  coef <- summary(model)$coefficients  %>%
+    as.data.frame() %>%
+    rownames_to_column("coef_labels") %>%
+    select(coef_labels, 
+           estimate = Estimate) 
+  
+  res.var <- summary(model)$sigma^2
+  
+  qr <- qr.solve(qr.R(model$qr)) %>%
+    as.data.frame() %>%
+    rownames_to_column()
+  
+  colnames(qr) <- c("coef_labels", paste0("qr_", 1:nrow(qr)))
+  
+  tidy <- tidy %>%
+    mutate(coef_labels = paste0(labels, vals)) %>%
+    full_join(coef, by = "coef_labels") %>%
+    full_join(qr, by = "coef_labels") %>%
+    select(- coef_labels) %>%
+    mutate(sym_labels = syms(labels))
+  
+  if(any(is.na(tidy$labels))){
+    stop("Error parsing the model")
   }
   
+  tidy
 }
